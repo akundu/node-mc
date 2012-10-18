@@ -141,10 +141,7 @@ function MemcacheClient(server, port) {
     this.port = port;
 }
 
-MemcacheClient.prototype.set = function(keyObj, options, callback) {
-    var objToHandleRequest = {}
-    objToHandleRequest.connect = this.makeSetRequest;
-    objToHandleRequest.read = this.handlingStoreResult;
+function defaultSetup(objToHandleRequest, options, callback) {
     objToHandleRequest.close = this.close;
     objToHandleRequest.timeout = this.timeout;
     objToHandleRequest.error = this.error;
@@ -154,30 +151,34 @@ MemcacheClient.prototype.set = function(keyObj, options, callback) {
     else {
         objToHandleRequest.freeConnectionOnCompletion = false;
     }
-
+    if(options && options.timeout) {
+        objToHandleRequest.timeout = options.timeout;
+    }
+    else {
+        objToHandleRequest.timeout = -1;
+    }
     objToHandleRequest.user_callback = callback;
+}
+
+MemcacheClient.prototype.set = function(keyObj, options, callback) {
+    var objToHandleRequest = {}
+    defaultSetup(objToHandleRequest, options, callback);
+
+    objToHandleRequest.connect = this.makeSetRequest;
+    objToHandleRequest.read = this.handlingStoreResult;
     objToHandleRequest.keyObj = keyObj;
+
     ns.getConnection(this.server, this.port, objToHandleRequest);
 }
 
 //Provide an input of array of keys to fetch along w/ callback to call after fetch is complete
 MemcacheClient.prototype.get = function(keys, options, callback) {
     var objToHandleRequest = {}
+    defaultSetup(objToHandleRequest, options, callback);
+
     objToHandleRequest.connect = this.makeGetRequest;
     objToHandleRequest.read = this.gettingData;
-    objToHandleRequest.close = this.close;
-    objToHandleRequest.timeout = this.timeout;
-    objToHandleRequest.error = this.error;
-    if(options && options.freeConnectionOnCompletion) {
-        objToHandleRequest.freeConnectionOnCompletion = options.freeConnectionOnCompletion;
-    }
-    else {
-        objToHandleRequest.freeConnectionOnCompletion = false;
-    }
-
     objToHandleRequest.keys = keys;
-    objToHandleRequest.user_callback = callback;
-
     objToHandleRequest.response = [];
     objToHandleRequest.complete_response = '';
     objToHandleRequest.state = READING_META_DATA;

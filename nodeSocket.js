@@ -43,6 +43,15 @@ function setupConnection(host, port, objToHandleRequest, timeout) {
 
 
 function removeHandlers(client) {
+    client.setTimeout(0);
+    /*
+     //we turn off the inactivity timeout in the case of releasing the connection back to the connection pool
+    client.on('timeout', function() {
+        client.destroy();
+        client = null;
+    });
+    */
+
     client.on('data', function(data) {
         //shouldnt be receiving any data since no one is listening
         client.destroy();
@@ -55,10 +64,6 @@ function removeHandlers(client) {
         client = null;
     });
 
-    client.on('timeout', function() {
-        client.destroy();
-        client = null;
-    });
 
     client.on('error', function(error) {
         console.log(error);
@@ -83,6 +88,7 @@ function setupHandlers(client, objToHandleRequest) {
         //console.log('client gave end');
         client.destroy();
         client = null;
+
         if(objToHandleRequest && objToHandleRequest.close) {
             objToHandleRequest.close(this);
         }
@@ -152,10 +158,11 @@ function getConnection(serverName, serverPort, objToHandleRequest){
         clientMap[nameToLookup] = [];
     }
 
+    var timeout = (objToHandleRequest.timeout && objToHandleRequest.timeout > -1 ? objToHandleRequest.timeout : -1);
     var client = null;
     if ((!(client = clientMap[nameToLookup].pop()))) {
         //console.log('setting up a new connection to ' + nameToLookup);
-        setupConnection(serverName, serverPort, objToHandleRequest);
+        setupConnection(serverName, serverPort, objToHandleRequest, timeout);
         return;
     }
 
