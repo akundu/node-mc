@@ -31,8 +31,8 @@ function convertTime(time) {
 
 var d = convertTime();
 x = new mc('127.0.0.1', 11211);
-x.set({key: "test1", flag: 5, expires: 10, value: d}, {freeConnectionOnCompletion: true}, function(){
-    x.get(['test', 'test1'], {freeConnectionOnCompletion: true}, function(error, responseObj) {
+x.set({key: "test1", flag: 5, expires: 10, value: d}, {putConnectionBackIntoPool: true}, function(){
+    x.get(['test', 'test1'], {putConnectionBackIntoPool: false}, function(error, responseObj) {
         if(error) {
             console.log('got error ' + error);
             return;

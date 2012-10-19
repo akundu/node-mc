@@ -11,12 +11,13 @@ MemcacheClient.prototype.handlingStoreResult = function(error, data, objToHandle
         return;
     }
 
-    ns.releaseConnection(objToHandleRequest.client, !objToHandleRequest.freeConnectionOnCompletion);
+    ns.releaseConnection(objToHandleRequest.client, objToHandleRequest.putConnectionBackIntoPool);
     objToHandleRequest.user_callback(null);
 }
 
 MemcacheClient.prototype.makeGetRequest = function(error, client, objToHandleRequest) {
     if(error) {
+        console.log(error);
         objToHandleRequest.user_callback(error);
         return;
     }
@@ -25,7 +26,6 @@ MemcacheClient.prototype.makeGetRequest = function(error, client, objToHandleReq
 
     //write the request for get
     var request = 'get ' + objToHandleRequest.keys.join(' ') + '\r\n';
-    //console.log('making request = ' + request);
     client.write(request, 'binary', function(){});
 }
 
@@ -38,12 +38,10 @@ MemcacheClient.prototype.gettingData = function(error, data, objToHandleRequest)
         return;
     }
 
-    //console.log('response = ' + objToHandleRequest.complete_response + ' and data = ' + data + ' state = ' + objToHandleRequest.state);
     objToHandleRequest.complete_response += data;
 
 
     while(objToHandleRequest.complete_response.length) {
-        //console.log('complete response length = ' + objToHandleRequest.complete_response.length + ' with string now = ' + objToHandleRequest.complete_response + ' with state = ' + objToHandleRequest.state);
         if(objToHandleRequest.state === READING_META_DATA){
             var endOfMetaData = objToHandleRequest.complete_response.indexOf('\r\n');
 
@@ -63,7 +61,7 @@ MemcacheClient.prototype.gettingData = function(error, data, objToHandleRequest)
                     objToHandleRequest.state = READING_VALUE;
                 }
                 else if(meta_data_split[0] === "END") {
-                    ns.releaseConnection(objToHandleRequest.client, !objToHandleRequest.freeConnectionOnCompletion);
+                    ns.releaseConnection(objToHandleRequest.client, objToHandleRequest.putConnectionBackIntoPool);
                     objToHandleRequest.user_callback(null, objToHandleRequest.response);
                     return;
                 }
@@ -79,7 +77,6 @@ MemcacheClient.prototype.gettingData = function(error, data, objToHandleRequest)
         if(objToHandleRequest.state === READING_VALUE){
             var resultObj = objToHandleRequest.response[objToHandleRequest.response.length-1]; //pick the last element on the array - cause thats the one thats getting filled up
 
-            //console.log("READING_VALUE state");
             if(objToHandleRequest.complete_response < (resultObj.length + 2 /*for \r\n*/)) { //more to read
                 return;
             }
@@ -103,7 +100,6 @@ MemcacheClient.prototype.makeSetRequest = function(error, client, objToHandleReq
     //write the request for set
     var keyObj = objToHandleRequest.keyObj;
     var request = 'set ' + keyObj.key + ' ' + keyObj.flag + ' ' + keyObj.expires + ' ' + keyObj.value.length + '\r\n' + keyObj.value + '\r\n';
-    //console.log('writing ' + request);
     objToHandleRequest.client = client;
     client.write(request, 'binary', function(){});
 }
@@ -145,13 +141,14 @@ function defaultSetup(objToHandleRequest, options, callback) {
     objToHandleRequest.close = this.close;
     objToHandleRequest.timeout = this.timeout;
     objToHandleRequest.error = this.error;
-    if(options && options.freeConnectionOnCompletion) {
-        objToHandleRequest.freeConnectionOnCompletion = options.freeConnectionOnCompletion;
+    if(options && options.putConnectionBackIntoPool !== undefined) {
+        objToHandleRequest.putConnectionBackIntoPool = options.putConnectionBackIntoPool;
     }
     else {
-        objToHandleRequest.freeConnectionOnCompletion = false;
+        objToHandleRequest.putConnectionBackIntoPool = true;
     }
-    if(options && options.timeout) {
+
+    if(options && options.timeout !== undefined) {
         objToHandleRequest.timeout = options.timeout;
     }
     else {

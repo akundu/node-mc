@@ -24,7 +24,6 @@ function setupConnection(host, port, objToHandleRequest, timeout) {
         if(timeout != -1) {
             client.setTimeout(timeout);
         }
-        //console.log('client connected to ' + host + ':' + port);
 
         if(objToHandleRequest && objToHandleRequest.connect) {
             setupHandlers(client, objToHandleRequest);
@@ -42,23 +41,44 @@ function setupConnection(host, port, objToHandleRequest, timeout) {
 }
 
 
-function removeHandlers(client) {
-    client.setTimeout(0);
-    /*
-     //we turn off the inactivity timeout in the case of releasing the connection back to the connection pool
-    client.on('timeout', function() {
-        client.destroy();
-        client = null;
-    });
-    */
+function removeFromConnectionPool(clientName, clientPort) {
+    //iterate through the client map and find this instance
+    var objArrOfName = clientMap[clientName];
+    if(!objArrOfName) {
+        return;
+    }
 
+    //iterate through the array to find this particular client
+    for(var i = 0; i < objArrOfName.length; ++i){
+        if(!objArrOfName[i] || objArrOfName[i] === undefined) {
+            objArrOfName.splice(i, 1);
+            continue;
+        }
+
+        //remove the client
+        if(objArrOfName[i].address().port == clientPort){
+            objArrOfName.splice(i, 1);
+            return;
+        }
+    }
+}
+
+function removeHandlers(client) {
+    client.removeAllListeners(); //remove all existing listeners
+
+    client.setTimeout(0);
+
+    var clientName = client.nameToLookup;
+    var clientPort = client.address().port;
     client.on('data', function(data) {
+        removeFromConnectionPool(clientName, clientPort);
         //shouldnt be receiving any data since no one is listening
         client.destroy();
         client = null;
     });
 
     client.on('end', function() {
+        removeFromConnectionPool(clientName, clientPort);
         //shouldnt be receiving any data since no one is listening
         client.destroy();
         client = null;
@@ -66,12 +86,14 @@ function removeHandlers(client) {
 
 
     client.on('error', function(error) {
+        removeFromConnectionPool(clientName, clientPort);
         console.log(error);
         client.destroy();
         client = null;
     });
 
     client.on('close', function() {
+        removeFromConnectionPool(clientName, clientPort);
         client = null;
     });
 }
@@ -79,13 +101,10 @@ function removeHandlers(client) {
 
 function setupHandlers(client, objToHandleRequest) {
     client.on('data', function(data) {
-        //console.log('got some data' + data);
         objToHandleRequest.read(null, data, objToHandleRequest);
-        //console.log(data.toString());
     });
 
     client.on('end', function() { //got fin packet
-        //console.log('client gave end');
         client.destroy();
         client = null;
 
@@ -95,7 +114,6 @@ function setupHandlers(client, objToHandleRequest) {
     });
 
     client.on('timeout', function() {
-        //console.log('client timedout');
         client.destroy();
         client = null;
 
@@ -105,7 +123,6 @@ function setupHandlers(client, objToHandleRequest) {
     });
 
     client.on('error', function(error) {
-        //console.log('error from clietn');
         console.log(error);
         client.destroy();
         client = null;
@@ -116,7 +133,6 @@ function setupHandlers(client, objToHandleRequest) {
     });
 
     client.on('close', function() { //got close
-        //console.log('client closed');
         client = null;
 
         if(objToHandleRequest && objToHandleRequest.close) {
@@ -126,6 +142,10 @@ function setupHandlers(client, objToHandleRequest) {
 }
 
 function releaseConnection(client, putInPool){
+    if(!client) {
+        return;
+    }
+
     if(putInPool === undefined) {
         putInPool = false;
     }
@@ -161,14 +181,13 @@ function getConnection(serverName, serverPort, objToHandleRequest){
     var timeout = (objToHandleRequest.timeout && objToHandleRequest.timeout > -1 ? objToHandleRequest.timeout : -1);
     var client = null;
     if ((!(client = clientMap[nameToLookup].pop()))) {
-        //console.log('setting up a new connection to ' + nameToLookup);
         setupConnection(serverName, serverPort, objToHandleRequest, timeout);
         return;
     }
 
     if(objToHandleRequest && objToHandleRequest.connect !== undefined) {
         setupHandlers(client, objToHandleRequest);
-        objToHandleRequest.connect(client, objToHandleRequest);
+        objToHandleRequest.connect(null, client, objToHandleRequest);
     }
 }
 
