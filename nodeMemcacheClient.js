@@ -4,17 +4,55 @@ var ns = require('./nodeSocket');
 const DEFAULT_MC_HOST = '127.0.0.1';
 const DEFAULT_MC_PORT = 11211;
 
-//private functions
-MemcacheClient.prototype.handlingStoreResult = function(error, data, objToHandleRequest) {
-    if(error) {
-        console.log('error on getting store confirmation ' + error);
-        return;
+
+//public functions
+function MemcacheClient(server, port) {
+    if(!server || server === undefined){
+        server = DEFAULT_MC_HOST;
+    }
+    if(!port || port === undefined){
+        port = DEFAULT_MC_PORT;
     }
 
-    ns.releaseConnection(objToHandleRequest.client, objToHandleRequest.putConnectionBackIntoPool);
-    objToHandleRequest.user_callback(null);
+    this.server = server;
+    this.port = port;
 }
 
+MemcacheClient.prototype.set = function(keyObj, options, callback) {
+    var objToHandleRequest = {}
+    this.defaultSetup(objToHandleRequest, options, callback);
+
+    objToHandleRequest.connect = this.makeSetRequest;
+    objToHandleRequest.keyObj = keyObj;
+
+    if(!(keyObj.noreply !== undefined && !keyObj.noreply)) {
+        objToHandleRequest.state = READING_META_DATA;
+    }
+
+    ns.getConnection(this.server, this.port, objToHandleRequest);
+}
+
+//Provide an input of array of keys to fetch along w/ callback to call after fetch is complete
+MemcacheClient.prototype.get = function(keys, options, callback) {
+    var objToHandleRequest = {}
+    this.defaultSetup(objToHandleRequest, options, callback);
+
+    objToHandleRequest.connect = this.makeGetRequest;
+    objToHandleRequest.keys = keys;
+    objToHandleRequest.response = [];
+    objToHandleRequest.state = READING_META_DATA;
+
+    ns.getConnection(this.server, this.port, objToHandleRequest);
+}
+
+
+
+
+
+
+
+
+//private functions
 MemcacheClient.prototype.makeGetRequest = function(error, client, objToHandleRequest) {
     if(error) {
         console.log(error);
@@ -31,7 +69,8 @@ MemcacheClient.prototype.makeGetRequest = function(error, client, objToHandleReq
 
 const READING_META_DATA = 1;
 const READING_VALUE = 2;
-MemcacheClient.prototype.gettingData = function(error, data, objToHandleRequest) {
+MemcacheClient.prototype.parseResponse = function(error, data, objToHandleRequest) {
+    //console.log('got to parseResponse with data ' + data);
     if(error) {
         console.log(error);
         objToHandleRequest.user_callback(error);
@@ -65,8 +104,14 @@ MemcacheClient.prototype.gettingData = function(error, data, objToHandleRequest)
                     objToHandleRequest.user_callback(null, objToHandleRequest.response);
                     return;
                 }
+                else if(meta_data_split[0] === "STORED") {
+                    ns.releaseConnection(objToHandleRequest.client, objToHandleRequest.putConnectionBackIntoPool);
+                    objToHandleRequest.user_callback(null);
+                    return;
+                }
                 else {
-                    objToHandleRequest.user_callback(new Error('invalid syntax on response'));
+                    ns.releaseConnection(objToHandleRequest.client, false);
+                    objToHandleRequest.user_callback(new Error('invalid syntax on response: with response = ' + objToHandleRequest.complete_response));
                     return;
                 }
             }
@@ -99,9 +144,25 @@ MemcacheClient.prototype.makeSetRequest = function(error, client, objToHandleReq
 
     //write the request for set
     var keyObj = objToHandleRequest.keyObj;
-    var request = 'set ' + keyObj.key + ' ' + keyObj.flag + ' ' + keyObj.expires + ' ' + keyObj.value.length + '\r\n' + keyObj.value + '\r\n';
+    var request = 'set ' + 
+                  keyObj.key + ' ' + 
+                  keyObj.flag + ' ' + 
+                  keyObj.expires + ' ' + 
+                  keyObj.value.length + 
+                  (keyObj.noreply === undefined || !keyObj.noreply ? '' : ' noreply') + 
+                  '\r\n' + 
+                  keyObj.value + 
+                  '\r\n';
+    //console.log('request = ' + request);
     objToHandleRequest.client = client;
-    client.write(request, 'binary', function(){});
+
+    client.write(request, 'binary', function(){
+        //since we're not going to get a STORED response here - we should release the connection back to the pool
+        if(keyObj.noreply !== undefined && keyObj.noreply) {
+            ns.releaseConnection(objToHandleRequest.client, objToHandleRequest.putConnectionBackIntoPool);
+            objToHandleRequest.user_callback(null);
+        }
+    });
 }
 
 MemcacheClient.prototype.close = function(objToHandleRequest) {
@@ -122,22 +183,7 @@ MemcacheClient.prototype.error = function(error, objToHandleRequest) {
     }
 }
 
-
-
-//public functions
-function MemcacheClient(server, port) {
-    if(!server || server === undefined){
-        server = DEFAULT_MC_HOST;
-    }
-    if(!port || port === undefined){
-        port = DEFAULT_MC_PORT;
-    }
-
-    this.server = server;
-    this.port = port;
-}
-
-function defaultSetup(objToHandleRequest, options, callback) {
+MemcacheClient.prototype.defaultSetup = function(objToHandleRequest, options, callback) {
     objToHandleRequest.close = this.close;
     objToHandleRequest.timeout = this.timeout;
     objToHandleRequest.error = this.error;
@@ -155,32 +201,8 @@ function defaultSetup(objToHandleRequest, options, callback) {
         objToHandleRequest.timeout = -1;
     }
     objToHandleRequest.user_callback = callback;
-}
-
-MemcacheClient.prototype.set = function(keyObj, options, callback) {
-    var objToHandleRequest = {}
-    defaultSetup(objToHandleRequest, options, callback);
-
-    objToHandleRequest.connect = this.makeSetRequest;
-    objToHandleRequest.read = this.handlingStoreResult;
-    objToHandleRequest.keyObj = keyObj;
-
-    ns.getConnection(this.server, this.port, objToHandleRequest);
-}
-
-//Provide an input of array of keys to fetch along w/ callback to call after fetch is complete
-MemcacheClient.prototype.get = function(keys, options, callback) {
-    var objToHandleRequest = {}
-    defaultSetup(objToHandleRequest, options, callback);
-
-    objToHandleRequest.connect = this.makeGetRequest;
-    objToHandleRequest.read = this.gettingData;
-    objToHandleRequest.keys = keys;
-    objToHandleRequest.response = [];
     objToHandleRequest.complete_response = '';
-    objToHandleRequest.state = READING_META_DATA;
-
-    ns.getConnection(this.server, this.port, objToHandleRequest);
+    objToHandleRequest.read = this.parseResponse;
 }
 
 
