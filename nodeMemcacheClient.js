@@ -174,7 +174,7 @@ MemcacheClient.prototype.setDefaultSetup = function(keyObj, objToHandleRequest, 
 }
 
 
-MemcacheClient.prototype.fillSetTypeRequests = function(error, client, objToHandleRequest, request) {
+MemcacheClient.prototype.fillSetTypeRequests = function(error, client, objToHandleRequest, command) {
     if(error) {
         objToHandleRequest.user_callback(error);
         return null;
@@ -183,6 +183,16 @@ MemcacheClient.prototype.fillSetTypeRequests = function(error, client, objToHand
     var keyObj = objToHandleRequest.keyObj;
     //console.log('request = ' + request);
     objToHandleRequest.client = client;
+
+    var request = command + ' ' + 
+                  keyObj.key + ' ' + 
+                  keyObj.flag + ' ' + 
+                  keyObj.expires + ' ' + 
+                  keyObj.value.length + 
+                  (keyObj.noreply === undefined || !keyObj.noreply ? '' : ' noreply') + 
+                  '\r\n' + 
+                  keyObj.value + 
+                  '\r\n';
 
     client.write(request, 'binary', function(){
         //since we're not going to get a STORED response here - we should release the connection back to the pool
@@ -195,80 +205,29 @@ MemcacheClient.prototype.fillSetTypeRequests = function(error, client, objToHand
 }
 
 
+const SET_COMMAND = 'set';
 MemcacheClient.prototype.makeSetRequest = function(error, client, objToHandleRequest) {
-    var keyObj = objToHandleRequest.keyObj;
-    //write the request for set
-    var request = 'set ' + 
-                  keyObj.key + ' ' + 
-                  keyObj.flag + ' ' + 
-                  keyObj.expires + ' ' + 
-                  keyObj.value.length + 
-                  (keyObj.noreply === undefined || !keyObj.noreply ? '' : ' noreply') + 
-                  '\r\n' + 
-                  keyObj.value + 
-                  '\r\n';
-
-    return this.fillSetTypeRequests(error, client, objToHandleRequest, request);
+    return this.fillSetTypeRequests(error, client, objToHandleRequest, SET_COMMAND);
 }
 
+const ADD_COMMAND = 'add';
 MemcacheClient.prototype.makeAddRequest = function(error, client, objToHandleRequest) {
-    var keyObj = objToHandleRequest.keyObj;
-    var request = 'add ' + 
-                  keyObj.key + ' ' + 
-                  keyObj.flag + ' ' + 
-                  keyObj.expires + ' ' + 
-                  keyObj.value.length + 
-                  (keyObj.noreply === undefined || !keyObj.noreply ? '' : ' noreply') + 
-                  '\r\n' + 
-                  keyObj.value + 
-                  '\r\n';
-
-    return this.fillSetTypeRequests(error, client, objToHandleRequest, request);
+    return this.fillSetTypeRequests(error, client, objToHandleRequest, ADD_COMMAND);
 }
 
+const REPLACE_COMMAND = 'replace';
 MemcacheClient.prototype.makeReplaceRequest = function(error, client, objToHandleRequest) {
-    var keyObj = objToHandleRequest.keyObj;
-    var request = 'replace ' + 
-                  keyObj.key + ' ' + 
-                  keyObj.flag + ' ' + 
-                  keyObj.expires + ' ' + 
-                  keyObj.value.length + 
-                  (keyObj.noreply === undefined || !keyObj.noreply ? '' : ' noreply') + 
-                  '\r\n' + 
-                  keyObj.value + 
-                  '\r\n';
-
-    return this.fillSetTypeRequests(error, client, objToHandleRequest, request);
+    return this.fillSetTypeRequests(error, client, objToHandleRequest, REPLACE_COMMAND);
 }
 
+const APPEND_COMMAND = 'append';
 MemcacheClient.prototype.makeAppendRequest = function(error, client, objToHandleRequest) {
-    var keyObj = objToHandleRequest.keyObj;
-    var request = 'append ' + 
-                  keyObj.key + ' ' + 
-                  keyObj.flag + ' ' + 
-                  keyObj.expires + ' ' + 
-                  keyObj.value.length + 
-                  (keyObj.noreply === undefined || !keyObj.noreply ? '' : ' noreply') + 
-                  '\r\n' + 
-                  keyObj.value + 
-                  '\r\n';
-
-    return this.fillSetTypeRequests(error, client, objToHandleRequest, request);
+    return this.fillSetTypeRequests(error, client, objToHandleRequest, APPEND_COMMAND);
 }
 
+const PREPEND_COMMAND = 'prepend'
 MemcacheClient.prototype.makePrependRequest = function(error, client, objToHandleRequest) {
-    var keyObj = objToHandleRequest.keyObj;
-    var request = 'prepend ' + 
-                  keyObj.key + ' ' + 
-                  keyObj.flag + ' ' + 
-                  keyObj.expires + ' ' + 
-                  keyObj.value.length + 
-                  (keyObj.noreply === undefined || !keyObj.noreply ? '' : ' noreply') + 
-                  '\r\n' + 
-                  keyObj.value + 
-                  '\r\n';
-
-    return this.fillSetTypeRequests(error, client, objToHandleRequest, request);
+    return this.fillSetTypeRequests(error, client, objToHandleRequest, PREPEND_COMMAND);
 }
 
 
@@ -308,6 +267,7 @@ MemcacheClient.prototype.defaultSetup = function(objToHandleRequest, options, ca
     else {
         objToHandleRequest.timeout = -1;
     }
+
     objToHandleRequest.user_callback = callback;
     objToHandleRequest.complete_response = '';
     objToHandleRequest.read = this.parseResponse.bind(this);

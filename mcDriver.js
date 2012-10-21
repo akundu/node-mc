@@ -15,7 +15,7 @@ mc.set({key: "test1", flag: 5, expires: 2, value: d}, {putConnectionBackIntoPool
         return;
     }
 
-    console.log('getting test1');
+    console.log('\n\ngetting test1');
     mc.get(['test', 'test1'], {putConnectionBackIntoPool: true}, function(error, responseObj) {
         if(error) {
             console.log('got error ' + error);
@@ -24,7 +24,7 @@ mc.set({key: "test1", flag: 5, expires: 2, value: d}, {putConnectionBackIntoPool
         console.log(responseObj);
 
 
-        console.log('setting test');
+        console.log('\n\nsetting test');
         mc.set({key: "test", flag: 5, expires: 2, value: d, noreply: true}, {putConnectionBackIntoPool: true}, function(error){
             if(error) {
                 console.log('couldnt store key properly');
@@ -32,7 +32,7 @@ mc.set({key: "test1", flag: 5, expires: 2, value: d}, {putConnectionBackIntoPool
             }
 
 
-            console.log('tetting test');
+            console.log('\n\ntetting test');
             mc.get(['test', 'test1'], {putConnectionBackIntoPool: true}, function(error, responseObj) {
                 if(error) {
                     console.log('got error ' + error);
@@ -41,7 +41,7 @@ mc.set({key: "test1", flag: 5, expires: 2, value: d}, {putConnectionBackIntoPool
                 console.log(responseObj);
 
 
-                console.log('replacing an invalid key');
+                console.log('\n\nreplacing an invalid key');
                 mc.replace({key: "testcrap", flag: 5, expires: 2, value: "replaced value", noreply: true}, {putConnectionBackIntoPool: true}, function(error){
                     if(error) {
                         console.log('got error ' + error);
@@ -51,7 +51,7 @@ mc.set({key: "test1", flag: 5, expires: 2, value: d}, {putConnectionBackIntoPool
 
 
 
-                    console.log('replacing a valid key');
+                    console.log('\n\nreplacing a valid key');
                     mc.replace({key: "test", flag: 5, expires: 2, value: "replaced value", noreply: true}, {putConnectionBackIntoPool: false}, function(error){
                         if(error) {
                             console.log('got error ' + error);
