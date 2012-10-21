@@ -18,6 +18,7 @@ function setupConnection(host, port, objToHandleRequest, timeout) {
             clientMap[nameToLookup] = [];
         }
         client.nameToLookup = nameToLookup;
+        client.clientPort = client.address().port;
 
 
         client.setNoDelay(true);
@@ -33,6 +34,7 @@ function setupConnection(host, port, objToHandleRequest, timeout) {
     });
 
     client.on('error', function(error) {
+        //console.log('ON: error on connect ');
         console.log(error);
         client.destroy();
         client = null;
@@ -64,13 +66,19 @@ function removeFromConnectionPool(clientName, clientPort) {
 }
 
 function removeHandlers(client) {
+    //console.log('removing handler');
+    if(!client) {
+        //console.log('client is null');
+        return;
+    }
     client.removeAllListeners(); //remove all existing listeners
 
     client.setTimeout(0);
 
     var clientName = client.nameToLookup;
-    var clientPort = client.address().port;
+    var clientPort = client.clientPort;
     client.on('data', function(data) {
+        //console.log('ON: data on removing handler');
         removeFromConnectionPool(clientName, clientPort);
         //shouldnt be receiving any data since no one is listening
         client.destroy();
@@ -78,6 +86,7 @@ function removeHandlers(client) {
     });
 
     client.on('end', function() {
+        //console.log('ON: end on removing handler');
         removeFromConnectionPool(clientName, clientPort);
         //shouldnt be receiving any data since no one is listening
         client.destroy();
@@ -86,6 +95,7 @@ function removeHandlers(client) {
 
 
     client.on('error', function(error) {
+        //console.log('ON: error on removing handler');
         removeFromConnectionPool(clientName, clientPort);
         console.log(error);
         client.destroy();
@@ -93,6 +103,7 @@ function removeHandlers(client) {
     });
 
     client.on('close', function() {
+        //console.log('ON: close on removing handler');
         removeFromConnectionPool(clientName, clientPort);
         client = null;
     });
@@ -100,11 +111,19 @@ function removeHandlers(client) {
 
 
 function setupHandlers(client, objToHandleRequest) {
+    if(!client) {
+        return;
+    }
+    client.removeAllListeners(); //remove all existing listeners
+
+    //console.log('setting up handlers');
     client.on('data', function(data) {
+        //console.log('ON: data on setup handler');
         objToHandleRequest.read(null, data, objToHandleRequest);
     });
 
     client.on('end', function() { //got fin packet
+        //console.log('ON: end on setup handler');
         client.destroy();
         client = null;
 
@@ -114,6 +133,7 @@ function setupHandlers(client, objToHandleRequest) {
     });
 
     client.on('timeout', function() {
+        //console.log('ON: timeout on setup handler');
         client.destroy();
         client = null;
 
@@ -123,6 +143,7 @@ function setupHandlers(client, objToHandleRequest) {
     });
 
     client.on('error', function(error) {
+        //console.log('ON: error on setup handler');
         console.log(error);
         client.destroy();
         client = null;
@@ -133,6 +154,7 @@ function setupHandlers(client, objToHandleRequest) {
     });
 
     client.on('close', function() { //got close
+        //console.log('ON: close on setup handler');
         client = null;
 
         if(objToHandleRequest && objToHandleRequest.close) {
@@ -181,10 +203,12 @@ function getConnection(serverName, serverPort, objToHandleRequest){
     var timeout = (objToHandleRequest.timeout && objToHandleRequest.timeout > -1 ? objToHandleRequest.timeout : -1);
     var client = null;
     if ((!(client = clientMap[nameToLookup].pop()))) {
+        //console.log('got new connection for ' + nameToLookup);
         setupConnection(serverName, serverPort, objToHandleRequest, timeout);
         return;
     }
 
+    //console.log('served conn. from pool for ' + nameToLookup);
     if(objToHandleRequest && objToHandleRequest.connect !== undefined) {
         setupHandlers(client, objToHandleRequest);
         objToHandleRequest.connect(null, client, objToHandleRequest);

@@ -18,26 +18,13 @@ function MemcacheClient(server, port) {
     this.port = port;
 }
 
-MemcacheClient.prototype.set = function(keyObj, options, callback) {
-    var objToHandleRequest = {}
-    this.defaultSetup(objToHandleRequest, options, callback);
-
-    objToHandleRequest.connect = this.makeSetRequest;
-    objToHandleRequest.keyObj = keyObj;
-
-    if(!(keyObj.noreply !== undefined && !keyObj.noreply)) {
-        objToHandleRequest.state = READING_META_DATA;
-    }
-
-    ns.getConnection(this.server, this.port, objToHandleRequest);
-}
-
+//retrieve commands
 //Provide an input of array of keys to fetch along w/ callback to call after fetch is complete
 MemcacheClient.prototype.get = function(keys, options, callback) {
     var objToHandleRequest = {}
     this.defaultSetup(objToHandleRequest, options, callback);
 
-    objToHandleRequest.connect = this.makeGetRequest;
+    objToHandleRequest.connect = this.makeGetRequest.bind(this);
     objToHandleRequest.keys = keys;
     objToHandleRequest.response = [];
     objToHandleRequest.state = READING_META_DATA;
@@ -46,7 +33,36 @@ MemcacheClient.prototype.get = function(keys, options, callback) {
 }
 
 
+//set commands
+MemcacheClient.prototype.set = function(keyObj, options, callback) {
+    var objToHandleRequest = {}
+    objToHandleRequest.connect = this.makeSetRequest.bind(this);
+    this.setDefaultSetup(keyObj, objToHandleRequest, options, callback);
+}
 
+MemcacheClient.prototype.add = function(keyObj, options, callback) {
+    var objToHandleRequest = {}
+    objToHandleRequest.connect = this.makeAddRequest.bind(this);
+    this.setDefaultSetup(keyObj, objToHandleRequest, options, callback);
+}
+
+MemcacheClient.prototype.replace = function(keyObj, options, callback) {
+    var objToHandleRequest = {}
+    objToHandleRequest.connect = this.makeReplaceRequest.bind(this);
+    this.setDefaultSetup(keyObj, objToHandleRequest, options, callback);
+}
+
+MemcacheClient.prototype.append = function(keyObj, options, callback) {
+    var objToHandleRequest = {}
+    objToHandleRequest.connect = this.makeAppendRequest.bind(this);
+    this.setDefaultSetup(keyObj, objToHandleRequest, options, callback);
+}
+
+MemcacheClient.prototype.prepend = function(keyObj, options, callback) {
+    var objToHandleRequest = {}
+    objToHandleRequest.connect = this.makePrependRequest.bind(this);
+    this.setDefaultSetup(keyObj, objToHandleRequest, options, callback);
+}
 
 
 
@@ -110,8 +126,15 @@ MemcacheClient.prototype.parseResponse = function(error, data, objToHandleReques
                     return;
                 }
                 else {
-                    ns.releaseConnection(objToHandleRequest.client, false);
-                    objToHandleRequest.user_callback(new Error('invalid syntax on response: with response = ' + objToHandleRequest.complete_response));
+                    //see if there were any errors
+                    var reExp = /ERROR/i;
+                    if(reExp.test(objToHandleRequest.complete_response)){
+                        ns.releaseConnection(objToHandleRequest.client, false);
+                    }
+                    else {
+                        ns.releaseConnection(objToHandleRequest.client, objToHandleRequest.putConnectionBackIntoPool);
+                    }
+                    objToHandleRequest.user_callback(new Error('error on response: with response = ' + objToHandleRequest.complete_response));
                     return;
                 }
             }
@@ -136,23 +159,28 @@ MemcacheClient.prototype.parseResponse = function(error, data, objToHandleReques
     }
 }
 
-MemcacheClient.prototype.makeSetRequest = function(error, client, objToHandleRequest) {
-    if(error) {
-        objToHandleRequest.user_callback(error);
-        return;
+
+
+MemcacheClient.prototype.setDefaultSetup = function(keyObj, objToHandleRequest, options, callback) {
+    this.defaultSetup(objToHandleRequest, options, callback);
+
+    objToHandleRequest.keyObj = keyObj;
+
+    if(!(keyObj.noreply !== undefined && !keyObj.noreply)) {
+        objToHandleRequest.state = READING_META_DATA;
     }
 
-    //write the request for set
+    ns.getConnection(this.server, this.port, objToHandleRequest);
+}
+
+
+MemcacheClient.prototype.fillSetTypeRequests = function(error, client, objToHandleRequest, request) {
+    if(error) {
+        objToHandleRequest.user_callback(error);
+        return null;
+    }
+
     var keyObj = objToHandleRequest.keyObj;
-    var request = 'set ' + 
-                  keyObj.key + ' ' + 
-                  keyObj.flag + ' ' + 
-                  keyObj.expires + ' ' + 
-                  keyObj.value.length + 
-                  (keyObj.noreply === undefined || !keyObj.noreply ? '' : ' noreply') + 
-                  '\r\n' + 
-                  keyObj.value + 
-                  '\r\n';
     //console.log('request = ' + request);
     objToHandleRequest.client = client;
 
@@ -163,7 +191,87 @@ MemcacheClient.prototype.makeSetRequest = function(error, client, objToHandleReq
             objToHandleRequest.user_callback(null);
         }
     });
+    return;
 }
+
+
+MemcacheClient.prototype.makeSetRequest = function(error, client, objToHandleRequest) {
+    var keyObj = objToHandleRequest.keyObj;
+    //write the request for set
+    var request = 'set ' + 
+                  keyObj.key + ' ' + 
+                  keyObj.flag + ' ' + 
+                  keyObj.expires + ' ' + 
+                  keyObj.value.length + 
+                  (keyObj.noreply === undefined || !keyObj.noreply ? '' : ' noreply') + 
+                  '\r\n' + 
+                  keyObj.value + 
+                  '\r\n';
+
+    return this.fillSetTypeRequests(error, client, objToHandleRequest, request);
+}
+
+MemcacheClient.prototype.makeAddRequest = function(error, client, objToHandleRequest) {
+    var keyObj = objToHandleRequest.keyObj;
+    var request = 'add ' + 
+                  keyObj.key + ' ' + 
+                  keyObj.flag + ' ' + 
+                  keyObj.expires + ' ' + 
+                  keyObj.value.length + 
+                  (keyObj.noreply === undefined || !keyObj.noreply ? '' : ' noreply') + 
+                  '\r\n' + 
+                  keyObj.value + 
+                  '\r\n';
+
+    return this.fillSetTypeRequests(error, client, objToHandleRequest, request);
+}
+
+MemcacheClient.prototype.makeReplaceRequest = function(error, client, objToHandleRequest) {
+    var keyObj = objToHandleRequest.keyObj;
+    var request = 'replace ' + 
+                  keyObj.key + ' ' + 
+                  keyObj.flag + ' ' + 
+                  keyObj.expires + ' ' + 
+                  keyObj.value.length + 
+                  (keyObj.noreply === undefined || !keyObj.noreply ? '' : ' noreply') + 
+                  '\r\n' + 
+                  keyObj.value + 
+                  '\r\n';
+
+    return this.fillSetTypeRequests(error, client, objToHandleRequest, request);
+}
+
+MemcacheClient.prototype.makeAppendRequest = function(error, client, objToHandleRequest) {
+    var keyObj = objToHandleRequest.keyObj;
+    var request = 'append ' + 
+                  keyObj.key + ' ' + 
+                  keyObj.flag + ' ' + 
+                  keyObj.expires + ' ' + 
+                  keyObj.value.length + 
+                  (keyObj.noreply === undefined || !keyObj.noreply ? '' : ' noreply') + 
+                  '\r\n' + 
+                  keyObj.value + 
+                  '\r\n';
+
+    return this.fillSetTypeRequests(error, client, objToHandleRequest, request);
+}
+
+MemcacheClient.prototype.makePrependRequest = function(error, client, objToHandleRequest) {
+    var keyObj = objToHandleRequest.keyObj;
+    var request = 'prepend ' + 
+                  keyObj.key + ' ' + 
+                  keyObj.flag + ' ' + 
+                  keyObj.expires + ' ' + 
+                  keyObj.value.length + 
+                  (keyObj.noreply === undefined || !keyObj.noreply ? '' : ' noreply') + 
+                  '\r\n' + 
+                  keyObj.value + 
+                  '\r\n';
+
+    return this.fillSetTypeRequests(error, client, objToHandleRequest, request);
+}
+
+
 
 MemcacheClient.prototype.close = function(objToHandleRequest) {
     if(objToHandleRequest && objToHandleRequest.user_callback) {
@@ -184,9 +292,9 @@ MemcacheClient.prototype.error = function(error, objToHandleRequest) {
 }
 
 MemcacheClient.prototype.defaultSetup = function(objToHandleRequest, options, callback) {
-    objToHandleRequest.close = this.close;
-    objToHandleRequest.timeout = this.timeout;
-    objToHandleRequest.error = this.error;
+    objToHandleRequest.close = this.close.bind(this);
+    objToHandleRequest.timeout = this.timeout.bind(this);
+    objToHandleRequest.error = this.error.bind(this);
     if(options && options.putConnectionBackIntoPool !== undefined) {
         objToHandleRequest.putConnectionBackIntoPool = options.putConnectionBackIntoPool;
     }
@@ -202,7 +310,7 @@ MemcacheClient.prototype.defaultSetup = function(objToHandleRequest, options, ca
     }
     objToHandleRequest.user_callback = callback;
     objToHandleRequest.complete_response = '';
-    objToHandleRequest.read = this.parseResponse;
+    objToHandleRequest.read = this.parseResponse.bind(this);
 }
 
 
