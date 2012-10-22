@@ -65,6 +65,20 @@ MemcacheClient.prototype.prepend = function(keyObj, options, callback) {
 }
 
 
+MemcacheClient.prototype.del = function(keyObj, options, callback) {
+    var objToHandleRequest = {}
+    objToHandleRequest.connect = this.makeDeleteRequest.bind(this);
+
+    this.defaultSetup(objToHandleRequest, options, callback);
+    objToHandleRequest.keyObj = keyObj;
+
+    if(!(keyObj.noreply !== undefined && !keyObj.noreply)) {
+        objToHandleRequest.state = READING_META_DATA;
+    }
+
+    ns.getConnection(this.server, this.port, objToHandleRequest);
+}
+
 
 
 
@@ -125,6 +139,11 @@ MemcacheClient.prototype.parseResponse = function(error, data, objToHandleReques
                     objToHandleRequest.user_callback(null);
                     return;
                 }
+                else if(meta_data_split[0] === "DELETED") {
+                    ns.releaseConnection(objToHandleRequest.client, objToHandleRequest.putConnectionBackIntoPool);
+                    objToHandleRequest.user_callback(null);
+                    return;
+                }
                 else {
                     //see if there were any errors
                     var reExp = /ERROR/i;
@@ -173,6 +192,31 @@ MemcacheClient.prototype.setDefaultSetup = function(keyObj, objToHandleRequest, 
     ns.getConnection(this.server, this.port, objToHandleRequest);
 }
 
+const DELETE_COMMAND = 'delete';
+MemcacheClient.prototype.makeDeleteRequest = function(error, client, objToHandleRequest, command) {
+    if(error) {
+        objToHandleRequest.user_callback(error);
+        return null;
+    }
+
+    var keyObj = objToHandleRequest.keyObj;
+    //console.log('request = ' + request);
+    objToHandleRequest.client = client;
+
+    var request = DELETE_COMMAND + ' ' + 
+                  keyObj.key + ' ' + 
+                  (keyObj.noreply === undefined || !keyObj.noreply ? '' : ' noreply') + 
+                  '\r\n'  ;
+
+    client.write(request, 'binary', function(){
+        //since we're not going to get a DELETED response here - we should release the connection back to the pool
+        if(keyObj.noreply !== undefined && keyObj.noreply) {
+            ns.releaseConnection(objToHandleRequest.client, objToHandleRequest.putConnectionBackIntoPool);
+            objToHandleRequest.user_callback(null);
+        }
+    });
+    return;
+}
 
 MemcacheClient.prototype.fillSetTypeRequests = function(error, client, objToHandleRequest, command) {
     if(error) {
@@ -272,9 +316,6 @@ MemcacheClient.prototype.defaultSetup = function(objToHandleRequest, options, ca
     objToHandleRequest.complete_response = '';
     objToHandleRequest.read = this.parseResponse.bind(this);
 }
-
-
-
 
 
 
