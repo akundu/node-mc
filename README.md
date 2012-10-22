@@ -10,6 +10,9 @@ MIT
 
 ## TODO
 * complete implementing all the mc commands
+    - incr/decr
+    - cas
+    - stats
 * implement HOWTO
 
 
