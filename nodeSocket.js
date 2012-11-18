@@ -182,6 +182,7 @@ function releaseConnection(client, putInPool){
         }
     }
 
+    client.removeAllListeners(); //remove all existing listeners
     client.destroy();
     client = null;
 }

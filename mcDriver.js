@@ -72,9 +72,11 @@ mc.set({key: "test1", flag: 5, expires: 10, value: d}, {putConnectionBackIntoPoo
                             console.log('\n\ngetting test');
                             mc.get(['test'], {putConnectionBackIntoPool: false}, function(error, responseObj) {
                                 if(error){
-                                    console.log('got error on delete ' + error);
+                                    console.log('got error on getting test ' + error);
+                                    console.log(error.stack);
                                     return;
                                 }
+                                console.log('got response = ');
                                 console.log(responseObj);
                             });
                         });
