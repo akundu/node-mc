@@ -24,12 +24,12 @@ MemcacheClient.prototype.get = function(keys, options, callback) {
     var objToHandleRequest = {}
     this.defaultSetup(objToHandleRequest, options, callback);
 
-    objToHandleRequest.connect = this.makeGetRequest.bind(this);
+    objToHandleRequest.connect = this.makeGetRequest.bind(this); //callback function to call by the socket layer once we've gotten the connection few lines down
     objToHandleRequest.keys = keys;
-    objToHandleRequest.response = [];
-    objToHandleRequest.state = READING_META_DATA;
+    objToHandleRequest.response = []; //result that will be given out
+    objToHandleRequest.state = READING_META_DATA; //state of parsing the response
 
-    ns.getConnection(this.server, this.port, objToHandleRequest);
+    ns.getConnection(this.server, this.port, objToHandleRequest); //get the connection (from the pool or a new one) and then callback into the .connect fxn
 }
 
 

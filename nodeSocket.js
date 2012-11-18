@@ -128,7 +128,7 @@ function setupHandlers(client, objToHandleRequest) {
         client = null;
 
         if(objToHandleRequest && objToHandleRequest.close) {
-            objToHandleRequest.close(this);
+            objToHandleRequest.close(objToHandleRequest);
         }
     });
 
@@ -138,7 +138,7 @@ function setupHandlers(client, objToHandleRequest) {
         client = null;
 
         if(objToHandleRequest && objToHandleRequest.timeout) {
-            objToHandleRequest.timeout(this);
+            objToHandleRequest.timeout(objToHandleRequest);
         }
     });
 
@@ -149,7 +149,7 @@ function setupHandlers(client, objToHandleRequest) {
         client = null;
 
         if(objToHandleRequest && objToHandleRequest.error) {
-            objToHandleRequest.error(error, this);
+            objToHandleRequest.error(error, objToHandleRequest);
         }
     });
 
@@ -158,7 +158,7 @@ function setupHandlers(client, objToHandleRequest) {
         client = null;
 
         if(objToHandleRequest && objToHandleRequest.close) {
-            objToHandleRequest.close(this);
+            objToHandleRequest.close(objToHandleRequest);
         }
     });
 }
