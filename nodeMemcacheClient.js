@@ -164,7 +164,7 @@ MemcacheClient.prototype.parseResponse = function(error, data, objToHandleReques
         if(objToHandleRequest.state === READING_VALUE){
             var resultObj = objToHandleRequest.response[objToHandleRequest.response.length-1]; //pick the last element on the array - cause thats the one thats getting filled up
 
-            if(objToHandleRequest.complete_response < (resultObj.length + 2 /*for \r\n*/)) { //more to read
+            if(objToHandleRequest.complete_response.length < (resultObj.length + 2 /*for \r\n*/)) { //more to read
                 return;
             }
 
