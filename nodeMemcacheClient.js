@@ -86,7 +86,9 @@ MemcacheClient.prototype.del = function(keyObj, options, callback) {
 MemcacheClient.prototype.makeGetRequest = function(error, client, objToHandleRequest) {
     if(error) {
         console.log(error);
-        objToHandleRequest.user_callback(error);
+        if(objToHandleRequest) {
+            objToHandleRequest.user_callback(error);
+        }
         return;
     }
 
@@ -103,7 +105,9 @@ MemcacheClient.prototype.parseResponse = function(error, data, objToHandleReques
     //console.log('got to parseResponse with data ' + data);
     if(error) {
         console.log(error);
-        objToHandleRequest.user_callback(error);
+        if(objToHandleRequest) {
+            objToHandleRequest.user_callback(error);
+        }
         return;
     }
 
@@ -195,7 +199,9 @@ MemcacheClient.prototype.setDefaultSetup = function(keyObj, objToHandleRequest, 
 const DELETE_COMMAND = 'delete';
 MemcacheClient.prototype.makeDeleteRequest = function(error, client, objToHandleRequest, command) {
     if(error) {
-        objToHandleRequest.user_callback(error);
+        if(objToHandleRequest) {
+            objToHandleRequest.user_callback(error);
+        }
         return null;
     }
 
@@ -220,7 +226,9 @@ MemcacheClient.prototype.makeDeleteRequest = function(error, client, objToHandle
 
 MemcacheClient.prototype.fillSetTypeRequests = function(error, client, objToHandleRequest, command) {
     if(error) {
-        objToHandleRequest.user_callback(error);
+        if(objToHandleRequest) {
+            objToHandleRequest.user_callback(error);
+        }
         return null;
     }
 
