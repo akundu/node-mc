@@ -102,7 +102,6 @@ MemcacheClient.prototype.makeGetRequest = function(error, client, objToHandleReq
 const READING_META_DATA = 1;
 const READING_VALUE = 2;
 MemcacheClient.prototype.parseResponse = function(error, data, objToHandleRequest) {
-    //console.log('got to parseResponse with data ' + data);
     if(error) {
         console.log(error);
         if(objToHandleRequest) {
@@ -111,7 +110,8 @@ MemcacheClient.prototype.parseResponse = function(error, data, objToHandleReques
         return;
     }
 
-    objToHandleRequest.complete_response += data;
+    var dataString = data.toString('binary');
+    objToHandleRequest.complete_response += dataString;
 
 
     while(objToHandleRequest.complete_response.length) {
@@ -166,6 +166,10 @@ MemcacheClient.prototype.parseResponse = function(error, data, objToHandleReques
             }
         }
         if(objToHandleRequest.state === READING_VALUE){
+            if(!objToHandleRequest.response.length) {
+                return;
+            }
+
             var resultObj = objToHandleRequest.response[objToHandleRequest.response.length-1]; //pick the last element on the array - cause thats the one thats getting filled up
 
             if(objToHandleRequest.complete_response.length < (resultObj.length + 2 /*for \r\n*/)) { //more to read
